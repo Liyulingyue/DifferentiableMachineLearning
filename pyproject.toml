@@ -3,14 +3,14 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "PaddleScienceKits"
-version = "0.1.0"
-description = "A machine learning kits based on PaddlePaddle, re-implementing classical models as paddle.nn.Layer."
+name = "DifferentiableMachineLearning"
+version = "0.2.0"
+description = "A machine learning kits re-implementing classical models as torch.nn.Module, differentiable and composable with deep networks."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
 authors = [{ name = "Liyulingyue" }]
-dependencies = ["paddlepaddle>=2.4"]
+dependencies = ["torch>=2.0"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",

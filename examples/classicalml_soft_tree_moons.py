@@ -5,9 +5,9 @@ leaves; with soft routing the gradient signal can flow back into
 all 14 parameters (W, b, leaf_logits) simultaneously.
 """
 
-import paddle
+import torch
 import numpy as np
-from PaddleScienceKits.ClassicalML import SoftDecisionTree
+from DifferentiableMachineLearning.ClassicalML import SoftDecisionTree
 
 
 def make_moons(n: int = 600, noise: float = 0.15, seed: int = 0):
@@ -18,24 +18,24 @@ def make_moons(n: int = 600, noise: float = 0.15, seed: int = 0):
     X = np.concatenate([x0, x1], axis=0)
     X += noise * rng.standard_normal(X.shape)
     y = np.concatenate([np.zeros(n // 2), np.ones(n // 2)]).astype("int64")
-    return paddle.to_tensor(X.astype("float32")), paddle.to_tensor(y)
+    return torch.tensor(X.astype("float32")), torch.tensor(y)
 
 
 def main():
-    paddle.seed(0)
+    torch.manual_seed(0)
     X, Y = make_moons()
     tree = SoftDecisionTree(depth=4, n_features=2, n_classes=2, temperature=1.5)
-    opt = paddle.optimizer.Adam(parameters=tree.parameters(), learning_rate=5e-2)
+    opt = torch.optim.Adam(tree.parameters(), lr=5e-2)
     for epoch in range(400):
         logits = tree(X)
-        loss = paddle.nn.functional.cross_entropy(logits, Y)
-        opt.clear_grad()
+        loss = torch.nn.functional.cross_entropy(logits, Y)
+        opt.zero_grad()
         loss.backward()
         opt.step()
         if epoch % 50 == 0:
-            acc = float(paddle.mean((tree.predict(X) == Y).astype("float32")))
+            acc = float(torch.mean((tree.predict(X) == Y).float()))
             print(f"epoch {epoch:3d}  loss={loss.item():.4f}  acc={acc:.3f}")
-    final_acc = float(paddle.mean((tree.predict(X) == Y).astype("float32")))
+    final_acc = float(torch.mean((tree.predict(X) == Y).float()))
     print(f"final train acc = {final_acc:.3f}")
 
 

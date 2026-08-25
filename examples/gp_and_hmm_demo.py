@@ -8,67 +8,67 @@
    emission sequence, report the Viterbi path.
 """
 
-import paddle
+import torch
 import numpy as np
-from PaddleScienceKits.ClassicalML import GaussianProcess, GaussianHMM
+from DifferentiableMachineLearning.ClassicalML import GaussianProcess, GaussianHMM
 
 
 def gp_demo():
-    paddle.seed(0)
+    torch.manual_seed(0)
     n = 40
-    x = paddle.linspace(-3.0, 3.0, n).unsqueeze(-1)
-    y = paddle.sin(x).squeeze(-1) + 0.1 * paddle.randn([n])
+    x = torch.linspace(-3.0, 3.0, n).unsqueeze(-1)
+    y = torch.sin(x).squeeze(-1) + 0.1 * torch.randn(n)
 
     gp = GaussianProcess(dim=1, n_train=n, kernel="rbf",
                          log_lengthscale=0.0, log_outputscale=0.0, log_noise=-1.0)
     gp.fit(x, y)
 
-    opt = paddle.optimizer.Adam(
-        parameters=[gp.log_lengthscale, gp.log_outputscale, gp.log_noise],
-        learning_rate=5e-3,
+    opt = torch.optim.Adam(
+        [gp.log_lengthscale, gp.log_outputscale, gp.log_noise],
+        lr=5e-3,
     )
     for epoch in range(150):
         loss = gp.neg_log_marginal_likelihood()
-        opt.clear_grad()
+        opt.zero_grad()
         loss.backward()
         opt.step()
         if epoch % 30 == 0:
-            print(f"GP epoch {epoch:3d}  NLML={float(loss.numpy().item()):.3f}  "
-                  f"ls={float(paddle.exp(gp.log_lengthscale).numpy().item()):.3f}  "
-                  f"noise={float(paddle.exp(gp.log_noise).numpy().item()):.3f}")
+            print(f"GP epoch {epoch:3d}  NLML={loss.item():.3f}  "
+                  f"ls={torch.exp(gp.log_lengthscale).item():.3f}  "
+                  f"noise={torch.exp(gp.log_noise).item():.3f}")
 
-    x_test = paddle.linspace(-5.0, 5.0, 20).unsqueeze(-1)
+    x_test = torch.linspace(-5.0, 5.0, 20).unsqueeze(-1)
     mean, std = gp.forward_with_std(x_test)
     print("x_test      mean        std")
-    for xi, m, s in zip(x_test.squeeze().numpy(), mean.squeeze().numpy(), std.squeeze().numpy()):
+    for xi, m, s in zip(x_test.squeeze().detach().cpu().numpy(), mean.squeeze().detach().cpu().numpy(), std.squeeze().detach().cpu().numpy()):
         print(f"{xi:+5.2f}    {m:+5.2f}    {s:5.2f}")
 
 
 def hmm_demo():
-    paddle.seed(0)
+    torch.manual_seed(0)
     np.random.seed(0)
-    trans = paddle.to_tensor([[0.95, 0.03, 0.02],
+    trans = torch.tensor([[0.95, 0.03, 0.02],
                               [0.05, 0.90, 0.05],
                               [0.10, 0.10, 0.80]])
-    emit = paddle.to_tensor([[0.85, 0.10, 0.05],
-                             [0.10, 0.80, 0.10],
-                             [0.05, 0.10, 0.85]])
-    start = paddle.to_tensor([0.5, 0.3, 0.2])
+    emit = torch.tensor([[0.85, 0.10, 0.05],
+                            [0.10, 0.80, 0.10],
+                            [0.05, 0.10, 0.85]])
+    start = torch.tensor([0.5, 0.3, 0.2])
 
     def sample(T):
-        s = int(np.random.choice(3, p=start.numpy()))
+        s = int(np.random.choice(3, p=start.detach().cpu().numpy()))
         seq, path = [], [s]
         for _ in range(T):
-            seq.append(int(np.random.choice(3, p=emit[s].numpy())))
+            seq.append(int(np.random.choice(3, p=emit[s].detach().cpu().numpy())))
             if _ < T - 1:
-                s = int(np.random.choice(3, p=trans[s].numpy()))
+                s = int(np.random.choice(3, p=trans[s].detach().cpu().numpy()))
                 path.append(s)
         return seq, path
 
     seq, path = sample(300)
     hmm = GaussianHMM(n_states=3, n_emissions=3)
-    hmm.fit_em(paddle.to_tensor(seq, dtype="int64"), n_iter=80)
-    pred_path = hmm.viterbi(paddle.to_tensor(seq, dtype="int64")).numpy()
+    hmm.fit_em(torch.tensor(seq, dtype=torch.int64), n_iter=80)
+    pred_path = hmm.viterbi(torch.tensor(seq, dtype=torch.int64)).detach().cpu().numpy()
     # Modulo permutation of state labels
     acc_direct = (np.array(path) == pred_path).mean()
     best = 0.0

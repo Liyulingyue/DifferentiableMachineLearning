@@ -10,31 +10,31 @@
    demonstrating phase transition near the critical temperature.
 """
 
-import paddle
+import torch
 import numpy as np
-from PaddleScienceKits.ClassicalML import SparseGP, SpectralClustering, RBM, IsingModel
+from DifferentiableMachineLearning.ClassicalML import SparseGP, SpectralClustering, RBM, IsingModel
 
 
 def sparse_gp_demo():
     print("=== Sparse GP (Titsias 2009) demo ===")
-    paddle.seed(0)
+    torch.manual_seed(0)
     n = 80
-    x = paddle.linspace(-4.0, 4.0, n).unsqueeze(-1)
-    y = paddle.sin(x).squeeze(-1) + 0.15 * paddle.randn([n])
+    x = torch.linspace(-4.0, 4.0, n).unsqueeze(-1)
+    y = torch.sin(x).squeeze(-1) + 0.15 * torch.randn(n)
 
     sg = SparseGP(n_inducing=15, dim=1, n_train=n, kernel="rbf")
     sg.fit_init(x, y)
 
-    print(f"Initial neg-ELBO: {float(sg.elbo().numpy().item()):.3f}")
+    print(f"Initial neg-ELBO: {float(sg.elbo().detach().cpu().item()):.3f}")
     sg.fit(n_outer=300, lr=1e-2)
-    print(f"Final   neg-ELBO: {float(sg.elbo().numpy().item()):.3f}")
+    print(f"Final   neg-ELBO: {float(sg.elbo().detach().cpu().item()):.3f}")
 
-    x_test = paddle.linspace(-6.0, 6.0, 15).unsqueeze(-1)
+    x_test = torch.linspace(-6.0, 6.0, 15).unsqueeze(-1)
     mean, std = sg.predict(x_test)
     print("\nx_test     mean       std")
     print("(note: std grows outside training range)")
     for xi, m, s in zip(
-        x_test.squeeze().numpy(), mean.squeeze().numpy(), std.squeeze().numpy()
+        x_test.squeeze().detach().cpu().numpy(), mean.squeeze().detach().cpu().numpy(), std.squeeze().detach().cpu().numpy()
     ):
         print(f"{float(xi):+7.3f}   {float(m):+7.4f}   {float(s):.4f}")
     print()
@@ -42,13 +42,13 @@ def sparse_gp_demo():
 
 def spectral_clustering_demo():
     print("=== Spectral Clustering (Ng-Jordan-Weiss) demo ===")
-    paddle.seed(0)
+    torch.manual_seed(0)
     np.random.seed(0)
 
     n = 60
-    X1 = paddle.randn([n, 2]) + paddle.to_tensor([-1.5, -1.5])
-    X2 = paddle.randn([n, 2]) + paddle.to_tensor([1.5, 1.5])
-    X = paddle.concat([X1, X2], axis=0)
+    X1 = torch.randn(n, 2) + torch.tensor([-1.5, -1.5])
+    X2 = torch.randn(n, 2) + torch.tensor([1.5, 1.5])
+    X = torch.cat([X1, X2], dim=0)
     y_true = np.array([0] * n + [1] * n)
 
     sc = SpectralClustering(n_clusters=2, gamma=0.3)
@@ -63,9 +63,9 @@ def spectral_clustering_demo():
     theta = np.linspace(0, 2 * np.pi, n)
     X1 = np.stack([np.cos(theta), np.sin(theta)], axis=1) * 2.0
     X2 = np.stack([np.cos(theta), np.sin(theta)], axis=1) * 4.0
-    X = paddle.to_tensor(np.concatenate([X1 + 0.3 * np.random.randn(n, 2),
-                                        X2 + 0.3 * np.random.randn(n, 2)],
-                                       axis=0).astype("float32"))
+    X = torch.tensor(np.concatenate([X1 + 0.3 * np.random.randn(n, 2),
+                                    X2 + 0.3 * np.random.randn(n, 2)],
+                                   axis=0).astype("float32"))
     sc2 = SpectralClustering(n_clusters=2, affinity="knn", n_neighbors=5)
     pred2 = sc2.fit_predict(X).numpy()
     acc2 = max((pred2[:n] == 0).sum() + (pred2[n:] == 1).sum(),
@@ -76,7 +76,7 @@ def spectral_clustering_demo():
 
 def rbm_demo():
     print("=== Restricted Boltzmann Machine (Hinton 2002) demo ===")
-    paddle.seed(0)
+    torch.manual_seed(0)
     np.random.seed(0)
 
     a = np.array([1, 1, 0, 0, 1, 0], dtype="float32")
@@ -86,14 +86,14 @@ def rbm_demo():
         base = a if np.random.rand() < 0.5 else b
         flip = np.random.rand(6) < 0.1
         X.append(np.where(flip, 1 - base, base))
-    X = paddle.to_tensor(np.array(X, dtype="float32"))
+    X = torch.tensor(np.array(X, dtype="float32"))
 
     rbm = RBM(n_visible=6, n_hidden=10, lr=0.05, k=1)
-    initial_fe = float(rbm.free_energy(X).mean().numpy().item())
+    initial_fe = float(rbm.free_energy(X).mean().item())
     print(f"Initial mean free energy: {initial_fe:.4f}")
 
     rbm.fit(X, n_epochs=300)
-    final_fe = float(rbm.free_energy(X).mean().numpy().item())
+    final_fe = float(rbm.free_energy(X).mean().item())
     print(f"Final   mean free energy: {final_fe:.4f}  (expect lower)")
     print(f"Free energy reduction:   {initial_fe - final_fe:.4f}")
 
@@ -110,7 +110,7 @@ def rbm_demo():
 def ising_demo():
     print("=== 2-D Ising Model (MCMC) demo ===")
     print("Critical temperature T_c = 2/ln(1+sqrt(2)) ≈ 2.269 (J=1)")
-    paddle.seed(0)
+    torch.manual_seed(0)
     np.random.seed(0)
 
     ising = IsingModel(n_rows=10, n_cols=10, J=1.0, h=0.0)

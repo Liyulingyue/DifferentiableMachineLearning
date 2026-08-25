@@ -1,18 +1,19 @@
-# PaddleScienceKits
+# DifferentiableMachineLearning
 
-一个基于飞桨的**经典统计学习 / 科学计算工具包**。
+A **classical statistics / scientific computing toolkit** built on top of PyTorch.
 
-> 核心定位：把传统机器学习、信号处理、概率推断方法，**重写为 `paddle.nn.Layer`**，
-> 从而可以像普通深度学习算子一样参与组网、梯度反传、GPU 加速。
+> Core idea: re-implement traditional ML, signal processing, and probabilistic
+> inference methods as **`torch.nn.Module`** so they compose with neural
+> networks, participate in autograd, and run on GPU like any other layer.
 
 This is **not** just a deep-learning toolkit. The whole point of
-`PaddleScienceKits` is: classical models are also parameters + structure,
-and structure can be expressed with `paddle.nn.Layer` so it composes with
+`DifferentiableMachineLibrary` is: classical models are also parameters + structure,
+and structure can be expressed with `torch.nn.Module` so it composes with
 neural networks.
 
 我们收录的方法都满足两条线：
 
-1. **不与 Paddle 内置功能重复**（CNN / RNN / Transformer / 各类优化器 / 损失函数 / 数据加载等都不在范围）。
+1. **不与 PyTorch 内置功能重复**（CNN / RNN / Transformer / 各类优化器 / 损失函数 / 数据加载等都不在范围）。
 2. **不是纯深度学习 pipeline**（图像分类、目标检测、分割等 end-to-end 模板不属于本工具包）。
 
 具体收/不收规则见 [`CONTRIBUTING.md`](./CONTRIBUTING.md)。
@@ -65,40 +66,43 @@ neural networks.
 ## 安装
 
 ```bash
-git clone https://github.com/Liyulingyue/PaddleScienceKits.git
-cd PaddleScienceKits
+git clone https://github.com/Liyulingyue/DifferentiableMachineLearning.git
+cd DifferentiableMachineLearning
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate      # Linux / macOS
+# .venv\Scripts\Activate.ps1    # Windows PowerShell
 pip install -e .
 ```
+
+依赖：`torch>=2.0`（CPU 版即可）。
 
 ## 快速上手
 
 ### 1. 时序与状态空间模型
 
 ```python
-import paddle
-from PaddleScienceKits.TimeSeries import AR, ARMA, FIR, Autoregressive
+import torch
+from DifferentiableMachineLearning.TimeSeries import AR, ARMA, FIR, Autoregressive
 
 # 通用 A(p) y = B(q) u + C(o) v
 model = Autoregressive(y_features=3, x_features=[2, 4], e_features=2)
-y = paddle.randn([8, 3])
-u1, u2, v = paddle.randn([8, 2]), paddle.randn([8, 4]), paddle.randn([8, 2])
+y = torch.randn(8, 3)
+u1, u2, v = torch.randn(8, 2), torch.randn(8, 4), torch.randn(8, 2)
 out = model(y, u1, u2, v)                      # [8, 1]
 
 ar = AR(p=5)
-y_seq = paddle.randn([8, 5])
+y_seq = torch.randn(8, 5)
 print(ar(y_seq).shape)                         # [8, 1]
 ```
 
 ```python
 # Kalman filter / smoother
-from PaddleScienceKits.ClassicalML import KalmanFilter
+from DifferentiableMachineLearning.ClassicalML import KalmanFilter
 kf = KalmanFilter(state_dim=2, obs_dim=2)
 x_smooth = kf(y_seq)                           # [T, state_dim]   smoother 输出
 
 # HMM / GMM-HMM
-from PaddleScienceKits.ClassicalML import GaussianHMM, GMMHMM
+from DifferentiableMachineLearning.ClassicalML import GaussianHMM, GMMHMM
 hmm = GaussianHMM(n_states=3, n_emissions=10)
 hmm.fit_em(seq, n_iter=80)
 gamma = hmm(seq)                               # [T, n_states]
@@ -110,7 +114,7 @@ gamma = ghmm(x_seq)
 path  = ghmm.viterbi(x_seq)
 
 # tICA 慢模
-from PaddleScienceKits.ClassicalML import tICA
+from DifferentiableMachineLearning.ClassicalML import tICA
 tica = tICA(n_components=3, dim=D, lag=20).fit(X)
 slow = tica.transform(X)                        # [T, n_components]
 ```
@@ -118,7 +122,7 @@ slow = tica.transform(X)                        # [T, n_components]
 ### 2. 降维与流形学习
 
 ```python
-from PaddleScienceKits.ClassicalML import PCA, ICA, NMF, tSNE, ProbabilisticPCAMixture
+from DifferentiableMachineLearning.ClassicalML import PCA, ICA, NMF, tSNE, ProbabilisticPCAMixture
 
 # PCA: 正交基是 nn.Parameter，每步 QR 重新正交化
 pca = PCA(n_components=2, dim=5).fit(X)
@@ -149,7 +153,7 @@ gamma = ppca(X)                                # [N, K]
 ### 3. 概率 / 生成模型
 
 ```python
-from PaddleScienceKits.ClassicalML import GMM, BayesianRidge, BayesianLinearVI, GaussianProcess, LinearChainCRF
+from DifferentiableMachineLearning.ClassicalML import GMM, BayesianRidge, BayesianLinearVI, GaussianProcess, LinearChainCRF
 
 # GMM: 软责任可微，EM 闭式更新
 gmm = GMM(k=3, dim=2, covariance_type="diag").fit_em(X, n_iter=20)
@@ -179,7 +183,7 @@ path  = crf.decode(features)
 ### 4. 核方法
 
 ```python
-from PaddleScienceKits.ClassicalML import KernelRidge, SVM
+from DifferentiableMachineLearning.ClassicalML import KernelRidge, SVM
 
 # KernelRidge: 对偶形式 + 闭式解
 kr = KernelRidge(n_support=200, dim_in=1, dim_out=1,
@@ -189,13 +193,13 @@ pred = kr(x_test)
 
 # LS-SVM: 对偶闭式线性系统；RBF / linear / poly；OvR 多分类
 svm = SVM(n_support=80, dim=2, n_classes=2, kernel="rbf", gamma=0.3, C=10.0).fit(X, Y)
-acc = (svm.predict(X) == Y).astype("float32").mean()
+acc = (svm.predict(X) == Y).float().mean()
 ```
 
 ### 5. 监督学习（分类 / 回归）
 
 ```python
-from PaddleScienceKits.ClassicalML import LDA, GaussianNB, MultinomialNB, SoftDecisionTree
+from DifferentiableMachineLearning.ClassicalML import LDA, GaussianNB, MultinomialNB, SoftDecisionTree
 
 # LDA: 闭式特征分解；投影 + 可微高斯判别 log p(y|x)
 lda = LDA(n_components=2, dim=2, n_classes=3).fit(X, Y)
@@ -207,13 +211,13 @@ mnb = MultinomialNB(n_features=6, n_classes=2, alpha=1.0).fit(counts, Y)
 
 # SoftDecisionTree
 tree = SoftDecisionTree(depth=4, n_features=2, n_classes=2, temperature=1.5)
-# train with Adam like any paddle layer
+# train with Adam like any torch layer
 ```
 
 ### 6. 聚类
 
 ```python
-from PaddleScienceKits.ClassicalML import KMeans, KNN
+from DifferentiableMachineLearning.ClassicalML import KMeans, KNN
 
 # KMeans: 软分配路径可微
 km = KMeans(k=4, dim=3, temperature=0.5)
@@ -224,7 +228,7 @@ hard = km(X_test, hard=True)                   # [N]
 
 # KNN: 记忆层
 nn = KNN(k=3, dim=4)
-nn.update_memory(paddle.randn([50, 4]))
+nn.update_memory(torch.randn(50, 4))
 idx = nn(X_test, mode="indices")                # [N, 3]
 avg = nn(X_test, mode="average")                # [N, dim]
 ```
@@ -232,7 +236,7 @@ avg = nn(X_test, mode="average")                # [N, dim]
 ### 7. 稀疏表示
 
 ```python
-from PaddleScienceKits.ClassicalML import SparseCoding
+from DifferentiableMachineLearning.ClassicalML import SparseCoding
 
 sc = SparseCoding(n_atoms=20, n_features=16, lmbda=0.05,
                   encoder="fista", n_iter=200)
@@ -243,8 +247,8 @@ z, x_hat = sc(X)                              # 编码 + 重建
 ### 8. 信号处理
 
 ```python
-import paddle
-from PaddleScienceKits.SignalProcessing import STFT, ISTFT, MelSpectrogram, WaveletFilterBank
+import torch
+from DifferentiableMachineLearning.SignalProcessing import STFT, ISTFT, MelSpectrogram, WaveletFilterBank
 
 # STFT / iSTFT：分析窗默认 Hann，可学习
 stft = STFT(win_length=400, hop_length=160, n_fft=512)
@@ -287,10 +291,13 @@ details = wfb(x)                                # list of 3 tensors
 * `examples/gmmhmm_and_ppca_demo.py` —— GMMHMM 3-state 恢复 + PPCA 混合 4-聚类
 * `examples/sparse_gp_spectral_mrf_demo.py` —— SparseGP 变分推断 + SpectralClustering 谱聚类 + RBM CD-k + IsingModel 相变
 
-## 旧项目说明
+## 测试
 
-`PaddleAutoregressive` 已被废弃，所有内容并入本仓库的
-`PaddleScienceKits.TimeSeries` 子模块。新公式更紧凑、批处理友好、参数量更少。
+```bash
+.\.venv\Scripts\python.exe -m pytest tests/
+```
+
+78 个单元测试覆盖 26 个组件的形状、关键行为与数值正确性。
 
 ## 许可
 

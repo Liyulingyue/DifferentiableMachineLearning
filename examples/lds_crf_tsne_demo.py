@@ -12,38 +12,38 @@
    distances.
 """
 
-import paddle
+import torch
 import numpy as np
-from PaddleScienceKits.ClassicalML import KalmanFilter, LinearChainCRF, tSNE
+from DifferentiableMachineLearning.ClassicalML import KalmanFilter, LinearChainCRF, tSNE
 
 
 def kalman_demo():
-    paddle.seed(0)
+    torch.manual_seed(0)
     T = 80
-    A = paddle.to_tensor([[1.0, 0.1], [0.0, 1.0]])
-    C = paddle.to_tensor([[1.0, 0.0], [0.0, 1.0]])
-    x_true = paddle.zeros([T, 2])
+    A = torch.tensor([[1.0, 0.1], [0.0, 1.0]])
+    C = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
+    x_true = torch.zeros(T, 2)
     for t in range(1, T):
-        x_true[t] = A @ x_true[t - 1] + 0.1 * paddle.randn([2])
-    y = x_true @ C.T + 0.05 * paddle.randn([T, 2])
+        x_true[t] = A @ x_true[t - 1] + 0.1 * torch.randn(2)
+    y = x_true @ C.T + 0.05 * torch.randn(T, 2)
 
     kf = KalmanFilter(state_dim=2, obs_dim=2)
-    kf.A.set_value(paddle.eye(2))
-    kf.C.set_value(paddle.eye(2))
+    kf.A.data.copy_(torch.eye(2))
+    kf.C.data.copy_(torch.eye(2))
     pred = kf(y)
-    err = float(paddle.mean((pred - x_true) ** 2))
+    err = float(torch.mean((pred - x_true) ** 2).detach())
     print(f"Kalman 2-D tracking MSE = {err:.4f}")
     print("first 5 smoother outputs (vs truth):")
     for t in range(5):
-        print(f"  t={t}  pred={pred[t].numpy()}  truth={x_true[t].numpy()}")
+        print(f"  t={t}  pred={pred[t].detach().cpu().numpy()}  truth={x_true[t].detach().cpu().numpy()}")
 
 
 def crf_demo():
-    paddle.seed(0)
+    torch.manual_seed(0)
     np.random.seed(0)
     n_tags = 3
     crf = LinearChainCRF(n_features=4, n_tags=n_tags)
-    opt = paddle.optimizer.Adam(parameters=crf.parameters(), learning_rate=5e-2)
+    opt = torch.optim.Adam(crf.parameters(), lr=5e-2)
 
     def make_example():
         T = 8
@@ -57,18 +57,18 @@ def crf_demo():
         # Make the emission features correlated with the tag: each
         # tag has a different mean feature vector so the emitter
         # has signal to lock onto.
-        tag_means = paddle.to_tensor(
+        tag_means = torch.tensor(
             [[1.0, 0.0, 0.0, 0.0],
              [0.0, 1.0, 0.0, 0.0],
-             [0.0, 0.0, 1.0, 0.0]], dtype="float32"
+             [0.0, 0.0, 1.0, 0.0]], dtype=torch.float32
         )
-        feats = tag_means[tags] + 0.1 * paddle.randn([T, 4])
-        return feats, paddle.to_tensor(tags, dtype="int64")
+        feats = tag_means[tags] + 0.1 * torch.randn(T, 4)
+        return feats, torch.tensor(tags, dtype=torch.int64)
 
     for step in range(400):
         feats, tags = make_example()
         loss = crf.nll(feats, tags)
-        opt.clear_grad()
+        opt.zero_grad()
         loss.backward()
         opt.step()
     n_correct, n_total = 0, 0
@@ -81,16 +81,16 @@ def crf_demo():
 
 
 def tsne_demo():
-    paddle.seed(0)
+    torch.manual_seed(0)
     np.random.seed(0)
     parts = []
-    for c in paddle.to_tensor([[0.0, 0.0, 0.0, 0.0, 0.0],
+    for c in torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0],
                                [5.0, 0.0, 0.0, 0.0, 0.0],
                                [0.0, 0.0, 5.0, 0.0, 0.0]]):
-        parts.append(0.1 * paddle.randn([25, 5]) + c)
-    X = paddle.concat(parts, axis=0)
+        parts.append(0.1 * torch.randn(25, 5) + c)
+    X = torch.cat(parts, dim=0)
     tsne = tSNE(n_components=2, perplexity=15.0, n_iter=120, learning_rate=5.0)
-    Y = tsne.fit_transform(X).numpy()
+    Y = tsne.fit_transform(X).detach().cpu().numpy()
     cent = [Y[i * 25:(i + 1) * 25].mean(axis=0) for i in range(3)]
     print("tSNE 2-D cluster centroids:")
     for i, c in enumerate(cent):

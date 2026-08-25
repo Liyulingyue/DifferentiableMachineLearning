@@ -9,21 +9,21 @@
    with EM and the recovered cluster labels are reported.
 """
 
-import paddle
+import torch
 import numpy as np
-from PaddleScienceKits.ClassicalML import GMMHMM, ProbabilisticPCAMixture
+from DifferentiableMachineLearning.ClassicalML import GMMHMM, ProbabilisticPCAMixture
 
 
 def gmmhmm_demo():
-    paddle.seed(0)
+    torch.manual_seed(0)
     np.random.seed(0)
     K, F = 3, 4
-    trans = paddle.to_tensor(
+    trans = torch.tensor(
         [[0.85, 0.10, 0.05],
          [0.10, 0.85, 0.05],
          [0.05, 0.10, 0.85]]
     )
-    means = paddle.to_tensor([
+    means = torch.tensor([
         [+2.0, 0.0, 0.0, 0.0],
         [0.0, +2.0, 0.0, 0.0],
         [0.0, 0.0, +2.0, 0.0],
@@ -34,15 +34,15 @@ def gmmhmm_demo():
         s = int(np.random.choice(K))
         for _ in range(T):
             z.append(s)
-            x.append(np.random.normal(means[s].numpy(), 0.2))
-            s = int(np.random.choice(K, p=trans[s].numpy()))
+            x.append(np.random.normal(means[s].detach().cpu().numpy(), 0.2))
+            s = int(np.random.choice(K, p=trans[s].detach().cpu().numpy()))
         return np.array(z), np.array(x)
 
     z_true, x_seq = sample(300)
-    x = paddle.to_tensor(x_seq, dtype="float32")
+    x = torch.tensor(x_seq, dtype=torch.float32)
     hmm = GMMHMM(n_states=K, n_components=1, n_features=F)
     hmm.fit_em(x, n_iter=50)
-    pred_path = hmm.viterbi(x).numpy()
+    pred_path = hmm.viterbi(x).detach().cpu().numpy()
     best = 0
     for perm in [(0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)]:
         m = np.array([perm[s] for s in pred_path])
@@ -51,10 +51,10 @@ def gmmhmm_demo():
 
 
 def ppca_mixture_demo():
-    paddle.seed(0)
+    torch.manual_seed(0)
     np.random.seed(0)
     K, F, L = 4, 10, 2
-    means_true = paddle.to_tensor(
+    means_true = torch.tensor(
         [[3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
          [0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
          [0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -63,20 +63,20 @@ def ppca_mixture_demo():
     parts = []
     y_true = []
     for k in range(K):
-        z = 0.3 * paddle.randn([50, L])
+        z = 0.3 * torch.randn(50, L)
         # Each cluster's loading is a different pair of feature axes.
-        W_k = paddle.zeros([F, L])
+        W_k = torch.zeros(F, L)
         W_k[2 * k, 0] = 1.0
         W_k[2 * k + 1, 1] = 1.0
-        X = means_true[k] + z @ W_k.T + 0.05 * paddle.randn([50, F])
+        X = means_true[k] + z @ W_k.T + 0.05 * torch.randn(50, F)
         parts.append(X)
         y_true.extend([k] * 50)
-    X = paddle.concat(parts, axis=0)
+    X = torch.cat(parts, dim=0)
     y_true = np.array(y_true)
 
     ppca = ProbabilisticPCAMixture(n_components=K, n_features=F, n_latent=L)
     ppca.fit_em(X, n_iter=30)
-    pred = ppca(X).numpy().argmax(axis=1)
+    pred = ppca(X).detach().cpu().numpy().argmax(axis=1)
     # Best permutation
     best = 0
     from itertools import permutations

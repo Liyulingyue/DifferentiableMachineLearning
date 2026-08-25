@@ -10,36 +10,36 @@
    permutation and report the reconstruction error.
 """
 
-import paddle
+import torch
 import numpy as np
-from PaddleScienceKits.ClassicalML import tICA, NMF
+from DifferentiableMachineLearning.ClassicalML import tICA, NMF
 
 
 def tica_demo():
-    paddle.seed(0)
+    torch.manual_seed(0)
     T = 4000
-    slow = paddle.cumsum(0.05 * paddle.randn([T]))
-    fast = paddle.cumsum(1.0 * paddle.randn([T]))
+    slow = torch.cumsum(0.05 * torch.randn(T), dim=0)
+    fast = torch.cumsum(1.0 * torch.randn(T), dim=0)
     theta = 0.5
-    R = paddle.to_tensor(
+    R = torch.tensor(
         [[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]
-    )
-    X = paddle.stack([slow, fast], axis=1) @ R.T
+    ).float()
+    X = torch.stack([slow, fast], dim=1) @ R.T.float()
     tica = tICA(n_components=1, dim=2, lag=20)
     tica.fit(X)
-    proj = tica.transform(X).squeeze().numpy()
+    proj = tica.transform(X).squeeze().detach().cpu().numpy()
     # Compute autocorrelation of the projected slow mode at lag=20.
-    proj_d = paddle.to_tensor(proj)
+    proj_d = torch.tensor(proj)
     a = proj_d[:-20]
     b = proj_d[20:]
     corr = float((a - a.mean()) @ (b - b.mean()) /
                  (a.shape[0] * a.std() * b.std()))
     print(f"tICA slow-mode autocorrelation at lag=20: {corr:.3f}")
     # Compare to the *fast* mode (any vector orthogonal to slow).
-    fast_axis = R @ paddle.to_tensor([0.0, 1.0])
+    fast_axis = R @ torch.tensor([0.0, 1.0])
     other = X @ fast_axis.unsqueeze(-1)
-    other = other.squeeze().numpy()
-    other_d = paddle.to_tensor(other)
+    other = other.squeeze().detach().cpu().numpy()
+    other_d = torch.tensor(other)
     a2 = other_d[:-20]
     b2 = other_d[20:]
     corr_fast = float((a2 - a2.mean()) @ (b2 - b2.mean()) /
@@ -48,24 +48,24 @@ def tica_demo():
 
 
 def nmf_demo():
-    paddle.seed(0)
+    torch.manual_seed(0)
     np.random.seed(0)
     n_features = 12
-    topic_a = paddle.to_tensor([3.0, 2.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-    topic_b = paddle.to_tensor([0.0, 0.0, 0.0, 2.0, 3.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-    topic_c = paddle.to_tensor([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0])
-    W_true = paddle.stack([topic_a, topic_b, topic_c], axis=0)
+    topic_a = torch.tensor([3.0, 2.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    topic_b = torch.tensor([0.0, 0.0, 0.0, 2.0, 3.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    topic_c = torch.tensor([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0])
+    W_true = torch.stack([topic_a, topic_b, topic_c], dim=0)
     N = 200
-    H_true = paddle.abs(paddle.randn([N, 3])) + 0.1
-    X = H_true @ W_true + 0.01 * paddle.abs(paddle.randn([N, n_features]))
+    H_true = torch.abs(torch.randn(N, 3)) + 0.1
+    X = H_true @ W_true + 0.01 * torch.abs(torch.randn(N, n_features))
 
     nmf = NMF(n_components=3, n_features=n_features, init="nndsvd")
     nmf.fit(X, n_iter=500)
     rec = nmf.reconstruct(nmf.H)
-    rel_err = float(paddle.mean(paddle.sum((X - rec) ** 2, axis=1)) /
-                    paddle.mean(paddle.sum(X ** 2, axis=1)))
+    rel_err = float(torch.mean(torch.sum((X - rec.detach()) ** 2, dim=1)) /
+                    torch.mean(torch.sum(X ** 2, dim=1)))
     # Per-topic cosine (best over permutations)
-    W = nmf.W.numpy()
+    W = nmf.W.detach().numpy()
     best = []
     for i in range(3):
         c = []
